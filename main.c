@@ -836,8 +836,7 @@ int main(int argc, char const *argv[])
                                 if ((result < WAIT_OBJECT_0) &&
                                     (result >= (WAIT_OBJECT_0 + EVENT_INDEX_COUNT_MAX)))
                                 {
-                                    error("Failed to wait on event: %d (%s)",
-                                            (int)result, strerror(GetLastError()));
+                                    error("Failed to wait on event: %d (%s)", (int)result, strerror(GetLastError()));
                                     break;
                                 }
 
@@ -863,7 +862,7 @@ int main(int argc, char const *argv[])
                                     memset(&ov_serial, 0, sizeof(ov_serial));
                                     ov_serial.hEvent = g_waiters[EVENT_SERIAL_INDEX];
 
-                                    if ((!WaitCommEvent(serial, &serial_events, &ov_serial))&&
+                                    if ((!WaitCommEvent(serial, &serial_events, &ov_serial)) &&
                                         (GetLastError() != ERROR_IO_PENDING))
                                     {
                                         error("Failed to register for next serial events: %s", strerror(GetLastError()));
