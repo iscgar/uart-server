@@ -1,15 +1,15 @@
 # UART Server
 
-A simple program to serve a serial port over TCP to multiple clients. The first connected
+A simple program that serves a serial port over TCP to multiple clients. The first connected
 client (in a FIFO fashion) can also send data to the serial port.
 
 ## Dependencies
 
-Windows, or a POSIX system with functional `poll()` support.
+Windows, or a POSIX-compliant system with a functional `poll(2)` implementation.
 
 ## Building
 
-Just build and link `main.c` and `serial.c` using your favourite compiler. For GCC on a POSIX
+Just build and link `main.c` and `serial.c` using your favourite compiler. For GCC on a Linux
 system the following command will do:
 
 ```bash
@@ -52,3 +52,7 @@ $ ./uart-server serial_port config_str [tcp_port]
     data bits you can simply pass `19200,,7` as the configuration string.
 
 * TCP Port -- The TCP to accept connections on (optional, the default is 8278).
+
+## License
+
+This program is licensed under the MIT license. See [LICENSE](LICENSE) for details.
