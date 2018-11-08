@@ -43,7 +43,7 @@ $ ./uart-server serial_port config_str [tcp_port]
     the serial port configuration string is `baudrate[,parity[,data-bits[,stop-bits]]]`.
 
     * **baudrate** - The baud rate to use, e.g. 115200 (required)
-    * **parity** - N for none, O for odd, E for even (optional, default is N)
+    * **parity** - N for none, O for odd, E for even, M for mark, S for space (optional, default is N)
     * **data-bits** - 5, 6, 7, or 8 (optional, default is 8)
     * **stop-bits** - 1, 1.5, or 2 (optional, default is 1)
 

@@ -23,30 +23,53 @@
  *   SOFTWARE.
  ************************************************************************************/
 
+#include <stdio.h>
 #include <string.h>
 #include "serial.h"
-
-#define ARRAY_SIZE(a)   (sizeof(a) / sizeof((a)[0]))
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
 #if defined(_WIN32)
+#   include <stdlib.h>
 #   include <tchar.h>
 
     SerialFd serial_open(const char *port_s, const struct SerialConfig *cfg, int timeout)
     {
         DCB comstate;
         SerialFd fd;
-        TCHAR portname[sizeof(_T("\\\\.\\COM256")) / sizeof(TCHAR)];
+        TCHAR *portname;
+        size_t portname_size = 0;
 
-        if (_stprintf_s(portname, ARRAY_SIZE(portname) - 1, _T("\\\\.\\%s"), port_s) >= (int)ARRAY_SIZE(portname))
+        if (!port_s)
         {
             return SERIAL_INVALID_FD;
         }
 
+        portname_size = sizeof("\\\\.\\") + strlen(port_s);
+        portname = (TCHAR *)malloc(portname_size * sizeof(TCHAR));
+
+        if (!portname)
+        {
+            return SERIAL_INVALID_FD;
+        }
+
+        /* Convert to TCHAR (just in case), and prefix with the \\.\ namespace in case the port name
+         * does not contain a backslash */
+        if (_sntprintf_s(portname, portname_size, _TRUNCATE,
+                         strchr(port_s, '\\') ? _T("%hs") : _T("\\\\.\\%hs"), port_s) >= portname_size)
+        {
+            free(portname);
+            return SERIAL_INVALID_FD;
+        }
+
         fd = CreateFile(portname, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, 0);
+
+        /* No need for the port name anymore */
+        free(portname);
+        portname = NULL;
+        portname_size = 0;
 
         if (fd != SERIAL_INVALID_FD)
         {
@@ -61,6 +84,14 @@ extern "C" {
             comstate.BaudRate = cfg->baudrate; /* Set the baud rate */
             comstate.fBinary = 1; /* Operate in binary mode */
             comstate.fParity = cfg->parity != e_parity_none; /* Set if parity should be active */
+            comstate.fOutX = comstate.fInX = FALSE;
+            comstate.fTXContinueOnXoff = FALSE;
+            comstate.fNull = FALSE;
+            comstate.fErrorChar = FALSE;
+            comstate.fAbortOnError = FALSE;
+            comstate.fOutxCtsFlow = FALSE;
+            comstate.fOutxDsrFlow = FALSE;
+            comstate.fDsrSensitivity = FALSE;
 
             switch (cfg->parity)
             {
@@ -74,6 +105,14 @@ extern "C" {
 
             case e_parity_even:
                 comstate.Parity = EVENPARITY;
+                break;
+
+            case e_parity_mark:
+                comstate.Parity = MARKPARITY;
+                break;
+
+            case e_parity_space:
+                comstate.Parity = SPACEPARITY;
                 break;
 
             default:
@@ -114,9 +153,7 @@ extern "C" {
             /* Added to the result of the previous memeber to get the timeout for write */
             timeouts.WriteTotalTimeoutConstant = 20;
 
-            if ((!SetCommState(fd, &comstate)) ||
-                (!SetCommTimeouts(fd, &timeouts)) ||
-                (!SetCommMask(fd, EV_RXCHAR)))
+            if ((!SetCommState(fd, &comstate)) || (!SetCommTimeouts(fd, &timeouts)))
             {
                 serial_close(fd);
                 return SERIAL_INVALID_FD;
@@ -165,7 +202,7 @@ extern "C" {
 
         CloseHandle(ov.hEvent);
 
-        return (int)n;
+        return (long)n;
 
     cleanup:
         CloseHandle(ov.hEvent);
@@ -221,7 +258,6 @@ extern "C" {
 #   include <fcntl.h>
 #   include <unistd.h>
 #   include <termios.h>
-#   include <stdio.h>
 
     static int convert_baudrate(int baudrate)
     {
@@ -266,20 +302,90 @@ extern "C" {
         case 9600:
             return B9600;
 
+#if defined(B19200)
         case 19200:
             return B19200;
+#endif /* defined(B19200) */
 
+#if defined(B38400)
         case 38400:
             return B38400;
+#endif /* defined(B38400) */
 
+#if defined(B57600)
         case 57600:
             return B57600;
+#endif /* defined(B57600) */
 
+#if defined(B115200)
         case 115200:
             return B115200;
+#endif /* defined(B115200) */
 
+#if defined(B230400)
         case 230400:
             return B230400;
+#endif /* defined(B230400) */
+
+#if defined(B460800)
+        case 460800:
+            return B460800;
+#endif /* defined(B460800) */
+
+#if defined(B500000)
+        case 500000:
+            return B500000;
+#endif /* defined(B500000) */
+
+#if defined(B576000)
+        case 576000:
+            return B576000;
+#endif /* defined(B576000) */
+
+#if defined(B921600)
+        case 921600:
+            return B921600;
+#endif /* defined(B921600) */
+
+#if defined(B1000000)
+        case 1000000:
+            return B1000000;
+#endif /* defined(B1000000) */
+
+#if defined(B1152000)
+        case 1152000:
+            return B1152000;
+#endif /* defined(B1152000) */
+
+#if defined(B1500000)
+        case 1500000:
+            return B1500000;
+#endif /* defined(B1500000) */
+
+#if defined(B2000000)
+        case 2000000:
+            return B2000000;
+#endif /* defined(B2000000) */
+
+#if defined(B2500000)
+        case 2500000:
+            return B2500000;
+#endif /* defined(B2500000) */
+
+#if defined(B3000000)
+        case 3000000:
+            return B3000000;
+#endif /* defined(B3000000) */
+
+#if defined(B3500000)
+        case 3500000:
+            return B3500000;
+#endif /* defined(B3500000) */
+
+#if defined(B4000000)
+        case 4000000:
+            return B4000000;
+#endif /* defined(B4000000) */
 
         default:
             return B0;
@@ -302,6 +408,11 @@ extern "C" {
         if (br == B0)
         {
             fprintf(stderr, "baudrate %d is not supported\n", cfg->baudrate);
+            return SERIAL_INVALID_FD;
+        }
+
+        if (!port_s)
+        {
             return SERIAL_INVALID_FD;
         }
 
@@ -358,6 +469,9 @@ extern "C" {
                     tio.c_cflag &= ~PARODD;
                     break;
 
+                /* Whatever those are, termios can't handle them */
+                case e_parity_mark:
+                case e_parity_space:
                 default:
                     serial_close(fd);
                     return SERIAL_INVALID_FD;

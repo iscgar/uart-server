@@ -32,6 +32,7 @@
  * Windows/POSIX compatibility glue.
  */
 #if defined(_WIN32)
+#   define WIN32_LEAN_AND_MEAN
 #   include <Windows.h>
 
 #   define SERIAL_INVALID_FD INVALID_HANDLE_VALUE
@@ -59,7 +60,9 @@ enum SerialParity
 {
     e_parity_none,
     e_parity_odd,
-    e_parity_even
+    e_parity_even,
+    e_parity_mark,
+    e_parity_space
 };
 
 enum SerialStopBits

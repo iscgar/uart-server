@@ -31,16 +31,17 @@
 #include <string.h>
 #include <signal.h>
 #include <time.h>
+#include "serial.h"
 
 #if (defined(__unix__) || defined(unix)) && !defined(USG)
 #   include <sys/param.h>
 #endif /* (defined(__unix__) || defined(unix)) && !defined(USG) */
 
-#ifdef _WIN32
-#   ifdef _MSC_VER
+#if defined(_WIN32)
+#   if defined(_MSC_VER)
 #       pragma comment(lib, "ws2_32.lib")
 #       pragma warning(disable : 4996)
-#   endif /* _MSC_VER */
+#   endif /* defined(_MSC_VER) */
 
 #   define WIN32_LEAN_AND_MEAN
 #   include <WinSock2.h>
@@ -51,7 +52,7 @@ typedef SOCKET Socket;
 typedef HANDLE Waiter;
 
 static WSADATA g_wsadata;
-#else /* if !_WIN32 */
+#else /* if !defined(_WIN32) */
 #   include <errno.h>
 #   include <sys/types.h>
 #   include <sys/socket.h>
@@ -68,14 +69,7 @@ static WSADATA g_wsadata;
 typedef int Socket;
 typedef uint32_t socklen_t;
 typedef struct pollfd Waiter;
-#endif /* !_WIN32 */
-
-/**
- * Need to include this here so that on Windows the inclusion of `Windows.h`
- * won't pull in Winsock which conflicts with Winsock2. The `WIN32_LEAN_AND_MEAN`
- * definition above takes care of it.
- */
-#include "serial.h"
+#endif /* !defined(_WIN32) */
 
 #define DEFAULT_PORT        8278
 #define SERIAL_TIMEOUT      1000
@@ -138,7 +132,7 @@ static int get_unsigned(const char *s, size_t len, unsigned *o_result)
 
     if ((!s) || (!len) || (!o_result))
     {
-        return 0;
+        return FALSE;
     }
 
     helper = *o_result = 0;
@@ -147,7 +141,7 @@ static int get_unsigned(const char *s, size_t len, unsigned *o_result)
     {
         if (!isdigit(*s))
         {
-            return 0;
+            return FALSE;
         }
 
         *o_result *= 10;
@@ -243,6 +237,14 @@ static const char* parse_serial_config(const char *config_str, struct SerialConf
                     o_config->parity = e_parity_even;
                     break;
 
+                case 'M':
+                    o_config->parity = e_parity_mark;
+                    break;
+
+                case 'S':
+                    o_config->parity = e_parity_space;
+                    break;
+
                 default:
                     /* Increment end to reach the error condition below */
                     ++end;
@@ -252,7 +254,7 @@ static const char* parse_serial_config(const char *config_str, struct SerialConf
 
             if (end - start > 1)
             {
-                return "Parity configuration must be either empty or one of N, O, or E";
+                return "Parity configuration must be either empty or one of N, O, E, M, or S";
             }
 
             break;
@@ -320,9 +322,9 @@ static const char* parse_serial_config(const char *config_str, struct SerialConf
 /**
  * A utility function that converts a parity enumeration value to a human readable string.
  */
-static const char* parity_to_string(enum SerialParity p)
+static const char* parity_to_string(enum SerialParity parity)
 {
-    switch (p)
+    switch (parity)
     {
     case e_parity_none:
         return "None";
@@ -333,6 +335,12 @@ static const char* parity_to_string(enum SerialParity p)
     case e_parity_even:
         return "Even";
 
+    case e_parity_mark:
+        return "Mark";
+
+    case e_parity_space:
+        return "Space";
+
     default:
         return "Unknown";
     }
@@ -341,9 +349,9 @@ static const char* parity_to_string(enum SerialParity p)
 /**
  * A utility function that converts a stop bits enumeration value to a human readable string.
  */
-static const char* stop_bits_to_string(enum SerialStopBits sb)
+static const char* stop_bits_to_string(enum SerialStopBits stop_bits)
 {
-    switch (sb)
+    switch (stop_bits)
     {
     case e_stop_bits_one:
         return "1";
@@ -450,8 +458,9 @@ static void help(const char *s, ...)
         fputs("  serial_port  The serial port to serve\n", stderr);
         fputs("  config_str   The configuration of the serial port: baudrate[,parity[,data_bits[,stop_bits]]]\n", stderr);
         fputs("                 baudrate    The baud rate to be used for the communication\n", stderr);
-        fprintf(stderr, "                 parity      N for none, O for odd, E for even [%c]\n", parity_to_string(SERIAL_CFG_DEFAULT_PARITY)[0]);
-        fprintf(stderr, "                 data_bits   The amount of data bits to use [%d]\n", SERIAL_CFG_DEFAULT_DATA_BITS);
+        fprintf(stderr, "                 parity      N, O, E, M, or S (for None, Odd, Even, Mark, or Space) [%c]\n",
+                parity_to_string(SERIAL_CFG_DEFAULT_PARITY)[0]);
+        fprintf(stderr, "                 data_bits   5, 6, 7, or 8 [%d]\n", SERIAL_CFG_DEFAULT_DATA_BITS);
         fprintf(stderr, "                 stop_bits   1, 1.5, or 2 [%s]\n", stop_bits_to_string(SERIAL_CFG_DEFAULT_STOP_BITS));
         fprintf(stderr, "  tcp_port     The port to serve on [%d]\n\n", DEFAULT_PORT);
         fputs("optional arguments:\n", stderr);
@@ -784,8 +793,8 @@ int main(int argc, char const *argv[])
                         }
                         /* Break the serial abstraction and listen for serial events because there's no
                          * real way to get serial events in a portable manner that makes sense. */
-                        else if ((!WaitCommEvent(serial, &serial_events, &ov_serial)) &&
-                                 (GetLastError() != ERROR_IO_PENDING))
+                        else if ((!SetCommMask(serial, EV_RXCHAR)) ||
+                                 ((!WaitCommEvent(serial, &serial_events, &ov_serial)) && (GetLastError() != ERROR_IO_PENDING)))
                         {
                             error("Failed to register for serial events: %s", strerror(GetLastError()));
                         }
@@ -970,7 +979,7 @@ int main(int argc, char const *argv[])
                             }
                         }
 #else /* if !defined(_WIN32) */
-                        /* Close both ends of shut down FIFO */
+                        /* Close both ends of shut down pipe */
                         close(g_close[0]);
                         close(g_close[1]);
 #endif /* !defined(_WIN32) */
